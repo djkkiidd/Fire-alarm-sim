@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fire Alarm Panel</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+<style>
+
+*{
+ box-sizing:border-box;
+ -webkit-tap-highlight-color:transparent
+}
+
+body{
+ margin:0;
+ background:#111;
+ color:white;
+ font-family:Arial,sans-serif;
+ text-align:center
+}
+
+.header{
+ background:#202020;
+ padding:18px;
+ border-bottom:3px solid #444
+}
+
+h1{
+ margin:0;
+ font-size:23px
+}
+
+.sim{
+ color:#ffd000;
+ font-size:11px;
+ letter-spacing:2px;
+ margin-top:6px
+}
+
+.panel{
+ width:94%;
+ max-width:500px;
+ margin:20px auto;
+ padding:20px;
+ background:linear-gradient(#333,#171717);
+ border:3px solid #555;
+ border-radius:18px;
+ box-shadow:0 10px 30px #000
+}
+
+.lights{
+ display:flex;
+ justify-content:space-around;
+ margin-bottom:18px
+}
+
+.lightBox{
+ font-size:10px;
+ color:#aaa
+}
+
+.light{
+ width:32px;
+ height:32px;
+ margin:auto;
+ margin-bottom:6px;
+ border-radius:50%;
+ background:#151515;
+ border:2px solid #555
+}
+
+.red.on{
+ background:red;
+ box-shadow:0 0 20px red
+}
+
+.green.on{
+ background:#00d95a;
+ box-shadow:0 0 20px #00d95a
+}
+
+.display{
+ background:#061006;
+ border:4px solid #333;
+ border-radius:7px;
+ padding:16px;
+ color:#55ff68;
+ font-family:monospace;
+ text-align:left;
+ margin-bottom:18px
+}
+
+.title{
+ font-size:21px;
+ font-weight:bold
+}
+
+.line{
+ margin-top:8px;
+ font-size:14px
+}
+
+input{
+ width:100%;
+ padding:15px;
+ border-radius:9px;
+ border:2px solid #555;
+ background:#080808;
+ color:white;
+ font-size:25px;
+ text-align:center;
+ letter-spacing:5px
+}
+
+.connect{
+ width:100%;
+ margin-top:10px;
+ padding:15px;
+ border:0;
+ border-radius:9px;
+ background:#1769ff;
+ color:white;
+ font-size:18px;
+ font-weight:bold
+}
+
+.keypad{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:8px;
+ margin-top:15px
+}
+
+.key{
+ padding:18px 5px;
+ border:0;
+ border-radius:9px;
+ background:#444;
+ color:white;
+ font-size:22px;
+ font-weight:bold
+}
+
+.key:active{
+ transform:scale(.95)
+}
+
+.controls{
+ display:grid;
+ grid-template-columns:repeat(2,1fr);
+ gap:8px;
+ margin-top:18px
+}
+
+.control{
+ padding:16px 5px;
+ border:0;
+ border-radius:9px;
+ background:#444;
+ color:white;
+ font-size:15px;
+ font-weight:bold
+}
+
+.reset{
+ background:#174d29
+}
+
+#strobe{
+ position:fixed;
+ inset:0;
+ background:white;
+ z-index:9999;
+ display:none;
+ pointer-events:none
+}
+
+#strobe.active{
+ display:block;
+ animation:whiteFlash .55s infinite
+}
+
+@keyframes whiteFlash{
+ 0%,44%{opacity:1}
+ 45%,100%{opacity:0}
+}
+
+body.alarm{
+ background:#260000
+}
+
+body.alarm .panel{
+ border-color:#b00000
+}
+
+body.alarm .red{
+ animation:redFlash .55s infinite
+}
+
+@keyframes redFlash{
+ 0%,49%{opacity:1}
+ 50%,100%{opacity:.2}
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<h1>🔥 FIRE ALARM PANEL</h1>
+<div class="sim">SIMULATION ONLY</div>
+</div>
+
+<div class="panel">
+
+<div class="lights">
+
+<div class="lightBox">
+<div id="red" class="light red"></div>
+ALARM
+</div>
+
+<div class="lightBox">
+<div id="green" class="light green on"></div>
+NORMAL
+</div>
+
+</div>
+
+<div class="display">
+
+<div id="title" class="title">
+SYSTEM NORMAL
+</div>
+
+<div id="status" class="line">
+ENTER PHONE 1 CODE
+</div>
+
+</div>
+
+<input
+ id="codeInput"
+ inputmode="numeric"
+ maxlength="6"
+ placeholder="6-digit code"
+ readonly
+>
+
+<div class="keypad">
+
+<button class="key" onclick="key('1')">1</button>
+<button class="key" onclick="key('2')">2</button>
+<button class="key" onclick="key('3')">3</button>
+
+<button class="key" onclick="key('4')">4</button>
+<button class="key" onclick="key('5')">5</button>
+<button class="key" onclick="key('6')">6</button>
+
+<button class="key" onclick="key('7')">7</button>
+<button class="key" onclick="key('8')">8</button>
+<button class="key" onclick="key('9')">9</button>
+
+<button class="key" onclick="clearCode()">C</button>
+<button class="key" onclick="key('0')">0</button>
+<button class="key" onclick="backspace()">⌫</button>
+
+</div>
+
+<button class="connect" onclick="connectToPhone1()">
+CONNECT
+</button>
+
+<div class="controls">
+
+<button class="control" onclick="silence()">
+🔇 SILENCE
+</button>
+
+<button class="control reset" onclick="resetPanel()">
+🔄 RESET
+</button>
+
+</div>
+
+</div>
+
+<div id="strobe"></div>
+
+<script>
+
+let peer;
+let connection=null;
+
+let audioContext=null;
+let oscillator=null;
+let gain=null;
+let soundTimer=null;
+
+function key(number){
+
+ let input=document.getElementById("codeInput");
+
+ if(input.value.length<6){
+   input.value+=number;
+ }
+
+}
+
+function clearCode(){
+
+ document.getElementById("codeInput").value="";
+
+}
+
+function backspace(){
+
+ let input=document.getElementById("codeInput");
+
+ input.value=input.value.slice(0,-1);
+
+}
+
+function start(){
+
+ peer=new Peer();
+
+ peer.on("open",function(){
+
+   document.getElementById("status").textContent=
+     "ENTER PHONE 1 CODE";
+
+ });
+
+ peer.on("error",function(error){
+
+   document.getElementById("status").textContent=
+     "CONNECTION STATUS: "+error.type;
+
+ });
+
+}
+
+function connectToPhone1(){
+
+ let code=
+   document.getElementById("codeInput").value;
+
+ if(code.length!==6){
+
+   document.getElementById("status").textContent=
+     "ENTER ALL 6 NUMBERS";
+
+   return;
+ }
+
+ document.getElementById("status").textContent=
+   "CONNECTING...";
+
+ connection=peer.connect(
+   "alarm"+code,
+   {reliable:true}
+ );
+
+ connection.on("open",function(){
+
+   document.getElementById("status").textContent=
+     "PHONE 1 CONNECTED ✓";
+
+ });
+
+ connection.on("data",function(message){
+
+   if(message.type==="FIRE_ALARM"){
+     activateAlarm();
+   }
+
+   if(message.type==="RESET"){
+     resetPanel();
+   }
+
+ });
+
+ connection.on("close",function(){
+
+   document.getElementById("status").textContent=
+     "PHONE 1 DISCONNECTED";
+
+ });
+
+}
+
+function setupSound(){
+
+ try{
+
+   audioContext=new(
+     window.AudioContext||
+     window.webkitAudioContext
+   )();
+
+   gain=audioContext.createGain();
+   gain.gain.value=0;
+   gain.connect(audioContext.destination);
+
+   oscillator=audioContext.createOscillator();
+   oscillator.type="square";
+   oscillator.connect(gain);
+   oscillator.start();
+
+ }catch(e){}
+
+}
+
+function activateAlarm(){
+
+ document.body.classList.add("alarm");
+
+ document.getElementById("red")
+   .classList.add("on");
+
+ document.getElementById("green")
+   .classList.remove("on");
+
+ document.getElementById("title")
+   .textContent="FIRE ALARM";
+
+ document.getElementById("status")
+   .textContent="ALARM ACTIVE";
+
+ document.getElementById("strobe")
+   .classList.add("active");
+
+ startSound();
+
+ if("vibrate" in navigator){
+
+   navigator.vibrate([
+     500,250,
+     500,250,
+     500
+   ]);
+
+ }
+
+}
+
+function startSound(){
+
+ if(!audioContext){
+   setupSound();
+ }
+
+ if(!audioContext)return;
+
+ if(audioContext.state==="suspended"){
+   audioContext.resume();
+ }
+
+ gain.gain.value=.15;
+
+ let high=false;
+
+ soundTimer=setInterval(function(){
+
+   high=!high;
+
+   oscillator.frequency.value=
+     high?900:600;
+
+ },350);
+
+}
+
+function silence(){
+
+ if(gain){
+   gain.gain.value=0;
+ }
+
+ if(soundTimer){
+   clearInterval(soundTimer);
+   soundTimer=null;
+ }
+
+ if("vibrate" in navigator){
+   navigator.vibrate(0);
+ }
+
+ document.getElementById("status")
+   .textContent="ALARM SILENCED";
+
+}
+
+function resetPanel(){
+
+ document.body.classList.remove("alarm");
+
+ document.getElementById("strobe")
+   .classList.remove("active");
+
+ document.getElementById("red")
+   .classList.remove("on");
+
+ document.getElementById("green")
+   .classList.add("on");
+
+ document.getElementById("title")
+   .textContent="SYSTEM NORMAL";
+
+ document.getElementById("status")
+   .textContent="READY";
+
+ if(gain){
+   gain.gain.value=0;
+ }
+
+ if(soundTimer){
+   clearInterval(soundTimer);
+   soundTimer=null;
+ }
+
+ if("vibrate" in navigator){
+   navigator.vibrate(0);
+ }
+
+}
+
+start();
+
+</script>
+
+</body>
+</html>
