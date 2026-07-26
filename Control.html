@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fire Alarm Pull Station</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+ margin:0;background:#111;color:white;
+ font-family:Arial,sans-serif;text-align:center
+}
+.header{
+ background:#202020;padding:18px;
+ border-bottom:3px solid #444
+}
+h1{margin:0;font-size:23px}
+.sim{
+ color:#ffd000;font-size:11px;
+ letter-spacing:2px;margin-top:6px
+}
+.panel{
+ width:94%;max-width:480px;
+ margin:20px auto;padding:20px;
+ background:linear-gradient(#333,#171717);
+ border:3px solid #555;border-radius:18px;
+ box-shadow:0 10px 30px #000
+}
+.status{
+ background:#061006;color:#55ff68;
+ font-family:monospace;
+ padding:15px;border-radius:8px;
+ border:3px solid #333;
+ margin-bottom:18px
+}
+.code{
+ font-size:30px;
+ letter-spacing:5px;
+ margin-top:8px
+}
+.pull{
+ width:100%;height:150px;
+ background:linear-gradient(#ed3333,#9b0000);
+ border:5px solid #620000;
+ border-radius:15px;
+ color:white;font-size:28px;
+ font-weight:bold
+}
+.pull:active{transform:translateY(5px)}
+.reset{
+ margin-top:15px;padding:15px 28px;
+ border:0;border-radius:10px;
+ background:#174d29;color:white;
+ font-size:18px;font-weight:bold
+}
+.note{
+ color:#999;font-size:11px;
+ margin-top:20px
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<h1>🚨 FIRE ALARM PULL STATION</h1>
+<div class="sim">SIMULATION ONLY</div>
+</div>
+
+<div class="panel">
+
+<div class="status">
+<div>PHONE 2 CONNECTION CODE</div>
+<div class="code" id="code">------</div>
+<div id="connection">STARTING...</div>
+</div>
+
+<button class="pull" onclick="pullAlarm()">
+🚨 PULL ALARM
+</button>
+
+<br>
+
+<button class="reset" onclick="resetAlarm()">
+RESET
+</button>
+
+<div class="note">
+This is a simulator and does not control real emergency equipment.
+</div>
+
+</div>
+
+<script>
+
+let peer;
+let connection=null;
+let roomCode="";
+
+function makeCode(){
+
+  return String(
+    Math.floor(100000 + Math.random()*900000)
+  );
+
+}
+
+function start(){
+
+  roomCode=makeCode();
+
+  document.getElementById("code").textContent=roomCode;
+
+  peer=new Peer("alarm"+roomCode);
+
+  peer.on("open",function(){
+
+    document.getElementById("connection").textContent=
+      "READY — ENTER THIS CODE ON PHONE 2";
+
+  });
+
+  peer.on("connection",function(conn){
+
+    connection=conn;
+
+    conn.on("open",function(){
+
+      document.getElementById("connection").textContent=
+        "PHONE 2 CONNECTED ✓";
+
+    });
+
+  });
+
+  peer.on("error",function(error){
+
+    document.getElementById("connection").textContent=
+      "CONNECTION STATUS: "+error.type;
+
+  });
+
+}
+
+function pullAlarm(){
+
+  if(!connection || !connection.open){
+
+    document.getElementById("connection").textContent=
+      "CONNECT PHONE 2 FIRST";
+
+    return;
+  }
+
+  connection.send({
+    type:"FIRE_ALARM"
+  });
+
+  document.getElementById("connection").textContent=
+    "🚨 ALARM SENT TO PHONE 2";
+
+}
+
+function resetAlarm(){
+
+  if(connection && connection.open){
+
+    connection.send({
+      type:"RESET"
+    });
+
+  }
+
+  document.getElementById("connection").textContent=
+    "PHONE 2 CONNECTED ✓";
+
+}
+
+start();
+
+</script>
+
+</body>
+</html>
